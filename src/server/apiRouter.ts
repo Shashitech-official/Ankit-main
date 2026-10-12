@@ -62,7 +62,17 @@ apiRouter.post('/chat', async (req, res) => {
     const ai = getGeminiClient();
     if (!ai) {
       return res.status(503).json({
-        error: 'Gemini API key is not configured. Please add GEMINI_API_KEY in your Netlify site environment variables (Site configuration > Environment variables).',
+        error: `Gemini API key is not configured in Netlify.
+
+### How to configure on Netlify:
+1. **Open Netlify Site Configuration**:
+   Navigate to **Site configuration > Environment variables** in your Netlify dashboard.
+2. **Add Variable**:
+   - **Key**: \`GEMINI_API_KEY\`
+   - **Value**: Your Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+   - **Scope**: Ensure **Functions** (or **All scopes**) is checked.
+3. **Trigger a New Deploy**:
+   Go to the **Deploys** tab in Netlify, click **Trigger deploy**, and select **Clear cache and deploy site**. *(Environment variables only apply to serverless functions on a new deploy!)*`,
       });
     }
 
