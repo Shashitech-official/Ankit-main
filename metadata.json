@@ -1,0 +1,6 @@
+{
+  "name": "Abs AI Assistant",
+  "description": "Next-generation creative intelligence assistant for seamless conversational AI, code generation, creative writing, visual design, and document exploration powered by Gemini.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
