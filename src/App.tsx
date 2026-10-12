@@ -269,10 +269,17 @@ export default function App() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
+      let messageContent = err?.message || 'An unexpected network error occurred.';
+      
+      // Only append API key instructions if the error specifically relates to missing API keys
+      if (messageContent.toLowerCase().includes('not configured') || messageContent.toLowerCase().includes('api_key')) {
+        messageContent = `${messageContent}\n\n*Please ensure your GEMINI_API_KEY is configured in your Netlify site settings (Site configuration > Environment variables) and you have triggered a new deploy.*`;
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Could not retrieve response from Gemini API: ${err.message || 'Network error'}\n\nMake sure the Gemini API key is configured.`,
+        content: messageContent,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMessage]);

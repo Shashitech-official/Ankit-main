@@ -160,7 +160,7 @@ apiRouter.post('/chat', async (req, res) => {
       }
     }
 
-    // Call Gemini with retry resilience
+    // Call Gemini with multi-tier resilience
     const selectedModel = expert ? 'gemini-3.8-flash' : (model || 'gemini-3.8-flash');
     let response: any = null;
     let usedModel = selectedModel;
@@ -176,17 +176,24 @@ apiRouter.post('/chat', async (req, res) => {
       });
     };
 
+    // Attempt cascade: selectedModel -> gemini-3.1-flash-lite -> gemini-flash-latest
     try {
       response = await generateWithModel(selectedModel);
     } catch (primaryErr: any) {
-      console.warn(`Primary model ${selectedModel} failed (${primaryErr.message}). Retrying...`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.warn(`Primary model ${selectedModel} failed (${primaryErr.message}). Switching to high-throughput flash-lite...`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
       try {
-        response = await generateWithModel(selectedModel);
-      } catch (retryErr: any) {
-        console.warn('Retrying with alternative flash model due to demand spike...');
-        usedModel = 'gemini-flash-latest';
+        usedModel = 'gemini-3.1-flash-lite';
         response = await generateWithModel(usedModel);
+      } catch (liteErr: any) {
+        console.warn(`Flash-lite attempt failed (${liteErr.message}). Retrying with gemini-flash-latest...`);
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        try {
+          usedModel = 'gemini-flash-latest';
+          response = await generateWithModel(usedModel);
+        } catch (latestErr: any) {
+          throw latestErr;
+        }
       }
     }
 
@@ -201,8 +208,29 @@ apiRouter.post('/chat', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Error in /api/chat:', error);
-    res.status(500).json({
-      error: error.message || 'An error occurred while communicating with Gemini API.',
+    let cleanMessage = error?.message || 'An error occurred while communicating with Gemini API.';
+
+    try {
+      const parsed = typeof cleanMessage === 'string' && cleanMessage.startsWith('{') ? JSON.parse(cleanMessage) : null;
+      if (parsed?.error?.message) {
+        cleanMessage = parsed.error.message;
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
+
+    const isDemandSpike =
+      cleanMessage.includes('503') ||
+      cleanMessage.includes('high demand') ||
+      cleanMessage.includes('UNAVAILABLE');
+
+    if (isDemandSpike) {
+      cleanMessage = 'The AI model is currently experiencing a temporary demand surge. Spikes are usually brief—please wait a few seconds and try again.';
+    }
+
+    res.status(isDemandSpike ? 503 : 500).json({
+      error: cleanMessage,
+      isDemandSpike,
     });
   }
 });
