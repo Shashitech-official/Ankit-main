@@ -3,22 +3,26 @@ import { GoogleGenAI } from '@google/genai';
 
 export const apiRouter = Router();
 
-function resolveGeminiApiKey(): string | null {
-  const key =
+function resolveGeminiApiKey(req?: any): string | null {
+  const headerKey = (req?.headers?.['x-gemini-api-key'] || req?.headers?.['x-api-key']) as string | undefined;
+  const rawKey =
     process.env.GEMINI_API_KEY ||
     process.env.NETLIFY_GEMINI_API_KEY ||
     process.env.VITE_GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.API_KEY ||
+    headerKey ||
     '';
-  if (!key || key === 'MY_GEMINI_API_KEY') {
+  if (!rawKey) return null;
+  const key = rawKey.trim().replace(/^["']|["']$/g, '');
+  if (!key || key === 'MY_GEMINI_API_KEY' || key.length < 5) {
     return null;
   }
   return key;
 }
 
-function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = resolveGeminiApiKey();
+function getGeminiClient(req?: any): GoogleGenAI | null {
+  const apiKey = resolveGeminiApiKey(req);
   if (!apiKey) {
     return null;
   }
@@ -34,7 +38,7 @@ function getGeminiClient(): GoogleGenAI | null {
 
 // Health check endpoint
 apiRouter.get('/health', (req, res) => {
-  const apiKey = resolveGeminiApiKey();
+  const apiKey = resolveGeminiApiKey(req);
   const isConfigured = Boolean(apiKey);
   res.json({
     configured: isConfigured,
@@ -59,7 +63,7 @@ apiRouter.post('/chat', async (req, res) => {
       model = 'gemini-3.8-flash',
     } = req.body;
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       return res.status(503).json({
         error: `Gemini API key is not configured in Netlify.
@@ -243,7 +247,7 @@ apiRouter.post('/speak', async (req, res) => {
       return res.status(400).json({ error: 'Text is required for TTS' });
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(req);
     if (!ai) {
       return res.status(503).json({ error: 'Gemini API is not configured.' });
     }
